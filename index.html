@@ -81,6 +81,8 @@
   .hit .glow { position: absolute; inset: 0; opacity: 0; pointer-events: none; border-radius: inherit; }
   #gongBtn .glow { background: radial-gradient(circle at 30% 50%, #e9b56f55, transparent 70%); }
   #chimeBtn .glow { background: radial-gradient(circle at 30% 50%, #cfeeff55, transparent 70%); }
+  #omBtn .glow, #circleBtn .glow { background: radial-gradient(circle at 30% 50%, #f2c9a455, transparent 70%); }
+  #circleBtn.on { border-color: rgba(242,201,164,.6); }
   .hdr-r { display: flex; gap: 8px; align-items: center; }
   .moonbtn { background: none; border: 1px solid var(--line); color: #c9c3ff; border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 12px; }
   .sheet { position: fixed; inset: 0; z-index: 8; background: rgba(3,7,10,.7); display: flex; align-items: flex-end; justify-content: center; }
@@ -155,6 +157,13 @@
   <div class="chips">
     <button class="chip" id="windBtn" type="button">Wind chimes</button>
   </div>
+
+  <h3>Om <small>chanting</small></h3>
+  <div class="hits">
+    <button class="hit" id="omBtn" type="button"><span class="glow"></span><b>Om</b><span class="sub">tap for one voice</span></button>
+    <button class="hit" id="circleBtn" type="button"><span class="glow"></span><b>Om circle</b><span class="sub">voices keep chanting · tap to stop</span></button>
+  </div>
+  <div class="slider"><label for="omLvl">Level</label><input id="omLvl" type="range" min="0" max="100" value="60"><output id="omLvlV">60</output></div>
 
   <h3>Nature</h3>
   <div class="chips" id="nature">
@@ -257,7 +266,7 @@
   const NOTE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
   const S = { owlVoice: "mine", owlDist: 5, owlRate: 5, nat: 45, set: 0, ref: 432, root: 48, octave: 0, forkOct: 1, droneOct: -1,
-              mode: "soft", tide: 0, space: 55, vol: 80, ring: 30, fring: 18, rub: 0.7 };
+              mode: "soft", tide: 0, omLvl: 60, space: 55, vol: 80, ring: 30, fring: 18, rub: 0.7 };
   try { Object.assign(S, JSON.parse(localStorage.getItem("stillwater") || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem("stillwater", JSON.stringify(S)); } catch (e) {} };
 
@@ -748,7 +757,59 @@
   function loadClips() {
     [1, 2, 3, 4, 5].forEach(i => loadClip(`audio/owl${i}.mp3`).then(b => hootBufs.push(b)).catch(() => {}));
     loadClip("audio/voice_msg.mp3").then(b => { voiceBuf = b; }).catch(() => {});
+    [1, 2, 3, 4].forEach(i => loadClip(`audio/om${i}.mp3`).then(b => { omBufs[i - 1] = b; }).catch(() => {}));
   }
+
+  // ---------------------------------------------------------------- om (recorded chants: 3 low voices + 1 high voice, sung at 136.1 Hz)
+  const OM_HZ = 136.1, omBufs = [];
+  let omGlow = 0, lastOm = -1, circle = null;
+  function omRate() {   // nudge the voice onto the nearest note of the current tuning (never more than a couple of semitones)
+    let best = Infinity;
+    for (const f of freqs) for (let k = -5; k <= 4; k++) {
+      const r = f * 2 ** k / OM_HZ; if (Math.abs(Math.log2(r)) < Math.abs(Math.log2(best))) best = r;
+    }
+    return Math.abs(Math.log2(best)) <= 0.25 ? best : 1;
+  }
+  function omVoice(i, pan, level, fade) {
+    const b = omBufs[i]; if (!b) return null;
+    const t = ctx.currentTime + 0.03, src = ctx.createBufferSource(); src.buffer = b;
+    src.playbackRate.value = omRate() * (1 + (Math.random() - 0.5) * 0.006);   // tiny drift so voices beat gently
+    const g = ctx.createGain(), mul = level * (i === 3 ? 0.55 : 1), base = (S.omLvl / 100) * mul;
+    g.gain.setValueAtTime(fade ? 0 : base, t); if (fade) g.gain.setTargetAtTime(base, t, fade);
+    const p = panNode(pan); src.connect(g).connect(p); src.start(t);
+    omGlow = 1;
+    src.onended = () => { try { p.disconnect(); } catch (e) {} };
+    return { src, g, mul, end: t + b.duration / src.playbackRate.value };
+  }
+  function omOnce() {
+    const have = [0, 1, 2].filter(i => omBufs[i]); if (!have.length) return;
+    let i; do { i = have[Math.floor(Math.random() * have.length)]; } while (have.length > 1 && i === lastOm);
+    lastOm = i; omVoice(i, (Math.random() - 0.5) * 0.3, 0.9);
+  }
+  function circleOn() {
+    if (circle) return;
+    circle = { live: new Set(), timers: [] };
+    const seats = [{ i: 0, pan: -0.45 }, { i: 1, pan: 0.4 }, { i: 2, pan: -0.1 }, { i: 3, pan: 0.15 }];
+    seats.forEach((seat, k) => {
+      const go = () => {
+        if (!circle) return;
+        const v = omVoice(seat.i, seat.pan + (Math.random() - 0.5) * 0.1, 0.55, k === 0 ? 0 : 0.05);
+        const len = v ? (v.end - ctx.currentTime) : 2;
+        if (v) { circle.live.add(v); v.src.addEventListener("ended", () => circle && circle.live.delete(v)); }
+        // breathe, then chant again; the high voice sits out now and then
+        const rest = 0.4 + Math.random() * 2.2 + (seat.i === 3 && Math.random() < 0.4 ? len : 0);
+        circle.timers.push(setTimeout(go, (len + rest) * 1000));
+      };
+      circle.timers.push(setTimeout(go, (k === 0 ? 0 : 1.5 + k * 1.8 + Math.random() * 2) * 1000));
+    });
+  }
+  function circleOff() {
+    if (!circle) return;
+    const c = circle; circle = null; c.timers.forEach(clearTimeout);
+    const t = ctx.currentTime;
+    c.live.forEach(v => { v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.setTargetAtTime(0, t, 1.2); try { v.src.stop(t + 7); } catch (e) {} });
+  }
+  function omLevel() { if (circle) circle.live.forEach(v => v.g.gain.setTargetAtTime((S.omLvl / 100) * v.mul, ctx.currentTime, 0.3)); }
   function myHoot(pan, dist) {
     if (!hootBufs.length) return false;
     let i; do { i = Math.floor(Math.random() * hootBufs.length); } while (hootBufs.length > 1 && i === lastHoot);
@@ -865,6 +926,7 @@
     Object.keys(beds).forEach(bedOff);
     windOn = false; owlsOn = false; S.tide = 0;
     if (bin) binauralSet(0);
+    circleOff(); $("circleBtn").classList.remove("on");
     syncChips();
   }
   function fmtLeft(sec) { const m = Math.ceil(sec / 60); return m >= 60 ? (Math.floor(m / 60) + " hr " + (m % 60 ? m % 60 + " min" : "")).trim() : m + " min"; }
@@ -1098,6 +1160,9 @@
   const ready = () => { if (!ctx) return false; if (ctx.state !== "running") unlock(); return true; };
   $("gongBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (ready()) gong(S.mode === "hard"); });
   $("chimeBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (ready()) shimmer(); });
+  $("omBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (ready()) omOnce(); });
+  $("circleBtn").onclick = () => { if (!ready()) return; circle ? circleOff() : circleOn(); $("circleBtn").classList.toggle("on", !!circle); };
+  slider("omLvl", "omLvl", v => v, () => { if (ctx) omLevel(); });
   $("windBtn").onclick = () => { if (!ready()) return; windOn = !windOn; $("windBtn").classList.toggle("on", windOn); };
   document.querySelectorAll("#nature .chip").forEach(c => c.onclick = () => {
     if (!ready()) return; const n = c.dataset.bed;
@@ -1207,7 +1272,7 @@
   const relSing = () => { [...singers.keys()].forEach(singOff); updateRelease(); };
   const relDrone = () => { [...drones.keys()].forEach(droneOff); updateRelease(); };
   $("relSing").onclick = relSing; $("relDrone").onclick = relDrone;
-  $("relAll").onclick = () => { relSing(); relDrone(); };
+  $("relAll").onclick = () => { relSing(); relDrone(); circleOff(); $("circleBtn").classList.remove("on"); };
 
   // tide: free-time auto player, weighted toward the lower bowls
   function tideTick() {
@@ -1253,6 +1318,10 @@
     gongGlow *= Math.pow(0.05, dt / 8); chimeGlow *= Math.pow(0.05, dt / 2.5);
     $("gongBtn").firstChild.style.opacity = gongGlow.toFixed(3);
     $("chimeBtn").firstChild.style.opacity = chimeGlow.toFixed(3);
+    if (circle) omGlow = Math.max(omGlow, 0.35 + 0.25 * Math.sin(now / 1400));
+    omGlow *= Math.pow(0.05, dt / 6);
+    $("omBtn").firstChild.style.opacity = (circle ? 0 : omGlow).toFixed(3);
+    $("circleBtn").firstChild.style.opacity = (circle ? omGlow : 0).toFixed(3);
     for (let k = ripples.length - 1; k >= 0; k--) {
       const r = ripples[k];
       let x, y;

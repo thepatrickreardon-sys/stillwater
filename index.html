@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>stillwater</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050b10; --ink: #d9e6e8; --dim: #6f8790; --line: rgba(160,200,210,.14);
+    --soft: #8fd3c8; --hard: #e9cf8f; --sing: #b4a3ff; --fork: #cfeeff; --drone: #7d9fff;
+    --mode: var(--soft);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  body { background: radial-gradient(120% 70% at 50% 30%, #0e2430 0%, #071219 55%, var(--bg) 100%) fixed;
+    min-height: 100vh; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+  main { max-width: 520px; margin: 0 auto; padding: 14px 14px 40px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  h1 { font: italic 400 30px/1 "Cormorant Garamond", Georgia, serif; margin: 0; letter-spacing: .5px; }
+  #status { display: block; background: none; border: 0; padding: 4px 0 0; font: inherit; font-size: 11px; color: var(--soft); letter-spacing: .4px; }
+  #status.bad { color: #ff9b8a; text-decoration: underline; }
+  .ref { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .ref button { background: none; border: 0; color: var(--dim); padding: 6px 11px; font: inherit; font-size: 12px; }
+  .ref button.on { color: var(--bg); background: var(--ink); }
+  .ref.fixed { opacity: .35; pointer-events: none; }
+
+  .tunings { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin: 0 -14px 10px; padding-left: 14px; padding-right: 14px; scrollbar-width: none; }
+  .tunings::-webkit-scrollbar { display: none; }
+  .chip { flex: none; background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 999px;
+    padding: 7px 13px; font: inherit; font-size: 13px; }
+  .chip.on { color: var(--ink); border-color: rgba(217,230,232,.7); background: rgba(217,230,232,.13); }
+  .sheet .chip.on { border-color: #c9c3ff; background: rgba(201,195,255,.18); color: #fff; }
+
+  .stage { position: relative; }
+  canvas#water { position: absolute; inset: -20px; width: calc(100% + 40px); height: calc(100% + 40px); pointer-events: none; }
+  .pads { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .pad { position: relative; aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--line);
+    background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.06), rgba(255,255,255,.01) 60%);
+    color: var(--dim); font: inherit; font-size: 12px; touch-action: manipulation; padding: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    transition: border-color .3s; }
+  .pad b { font: 600 17px/1 "Cormorant Garamond", Georgia, serif; color: var(--ink); opacity: .85; }
+  .pad .glow { position: absolute; inset: -1px; border-radius: 50%; pointer-events: none; opacity: 0; }
+  .pad .ring { position: absolute; inset: 7px; border-radius: 50%; border: 1.5px solid var(--sing); opacity: 0; pointer-events: none; }
+  .pad .dr { position: absolute; left: 30%; right: 30%; bottom: 9px; height: 2px; border-radius: 2px; background: var(--drone); opacity: 0; }
+
+  .modes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 18px 0 14px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+  .modes button { background: none; border: 0; color: var(--dim); font: inherit; font-size: 13px; padding: 10px 0; border-radius: 10px; }
+  .modes button.on { color: var(--bg); background: var(--mode); font-weight: 600; }
+
+  .slider { display: grid; grid-template-columns: 64px 1fr 58px; align-items: center; gap: 10px; margin: 10px 0; }
+  .slider label { color: var(--dim); font-size: 13px; }
+  .slider output { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: none; }
+  input[type=range]::-webkit-slider-runnable-track { height: 3px; background: var(--line); border-radius: 3px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9.5px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 12px rgba(200,230,240,.35); }
+  input[type=range]::-moz-range-track { height: 3px; background: var(--line); }
+  input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--ink); }
+
+  .row { display: flex; gap: 8px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+  .btn { background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--ink); border-radius: 12px;
+    padding: 10px 12px; font: inherit; font-size: 13px; }
+  .btn.small { padding: 10px 14px; }
+  .oct { display: flex; align-items: center; gap: 6px; margin-right: auto; color: var(--dim); font-size: 13px; }
+  .oct span { min-width: 22px; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .btn.live { border-color: rgba(217,230,232,.55); }
+
+  h3 { font: italic 400 21px/1 "Cormorant Garamond", Georgia, serif; margin: 22px 0 10px; color: var(--ink); }
+  h3 small { font: 12px -apple-system, system-ui, sans-serif; color: var(--dim); margin-left: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .hits { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hit { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; padding: 16px 12px;
+    background: rgba(255,255,255,.03); color: var(--ink); font: inherit; text-align: left; touch-action: manipulation;
+    display: flex; flex-direction: column; gap: 4px; }
+  .hit b { font: 600 22px/1 "Cormorant Garamond", Georgia, serif; }
+  .hit .sub { font-size: 11px; color: var(--dim); }
+  .hit .glow { position: absolute; inset: 0; opacity: 0; pointer-events: none; border-radius: inherit; }
+  #gongBtn .glow { background: radial-gradient(circle at 30% 50%, #e9b56f55, transparent 70%); }
+  #chimeBtn .glow { background: radial-gradient(circle at 30% 50%, #cfeeff55, transparent 70%); }
+  .hdr-r { display: flex; gap: 8px; align-items: center; }
+  .moonbtn { background: none; border: 1px solid var(--line); color: #c9c3ff; border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 12px; }
+  .sheet { position: fixed; inset: 0; z-index: 8; background: rgba(3,7,10,.7); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet[hidden], #sleepScreen[hidden] { display: none; }
+  .sheet .card { width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; background: #0b1820; border: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 6px 18px 26px; }
+  .dim { color: var(--dim); font-size: 13px; margin: 0 0 8px; } .dim.small { font-size: 12px; margin-top: 12px; }
+  .hint { text-transform: none; letter-spacing: 0; opacity: .7; margin-left: 4px; }
+  #sleepScreen.nl { background: radial-gradient(circle at 50% 42%, rgba(150,70,12,.42), rgba(60,25,4,.18) 45%, #000 75%), #000; color: #5a3a1c; }
+  #sleepScreen.nl .moon { box-shadow: inset -12px -4px 0 0 #6b4220; }
+  #sleepScreen.nl .hold { border-color: #2a1a0c; color: #5a3a1c; }
+  .lab { color: var(--dim); font-size: 12px; margin-top: 14px; text-transform: uppercase; letter-spacing: .8px; }
+  .row.end { justify-content: flex-end; }
+  #atTime { color-scheme: dark; font-size: 16px; min-width: 140px; }
+  .btn.primary { background: #c9c3ff; color: #0b1018; border-color: transparent; font-weight: 600; padding: 10px 22px; }
+  #sleepScreen { position: fixed; inset: 0; z-index: 10; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #2c3440; }
+  #sleepScreen .moon { width: 46px; height: 46px; border-radius: 50%; box-shadow: inset -12px -4px 0 0 #1d2430; transform: rotate(-20deg); animation: moonb 9s ease-in-out infinite; }
+  @keyframes moonb { 50% { opacity: .5; } }
+  #sleepLeft { font-size: 13px; letter-spacing: 1px; }
+  .hold { position: absolute; bottom: 40px; padding: 14px 26px; background: none; border: 1px solid #141a22; border-radius: 999px; font: inherit; font-size: 12px; color: #2c3440; }
+  details { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 10px; }
+  summary { color: var(--dim); font-size: 13px; padding: 6px 0; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: " +"; }
+  details[open] summary::after { content: " –"; }
+  .tip { color: var(--dim); font-size: 12px; margin-top: 16px; }
+
+  #start { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: rgba(5,11,16,.86); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 0; color: var(--ink); width: 100%; font: inherit; }
+  #start .big { font: italic 400 44px/1 "Cormorant Garamond", Georgia, serif; }
+  #start .sub { color: var(--dim); font-size: 14px; }
+  #start .circle { width: 84px; height: 84px; border-radius: 50%; border: 1px solid rgba(217,230,232,.5); animation: br 4s ease-in-out infinite; }
+  @keyframes br { 50% { transform: scale(1.12); opacity: .55; } }
+</style>
+</head>
+<body>
+<button id="start" type="button">
+  <div class="circle"></div>
+  <div class="big">stillwater</div>
+  <div class="sub">tap to begin</div>
+</button>
+
+<main>
+  <header>
+    <div><h1>stillwater</h1><button id="status" type="button">starting…</button></div>
+    <div class="hdr-r">
+      <button id="sleepBtn" class="moonbtn" type="button">☾ Sleep</button>
+      <div class="ref" id="ref">
+        <button data-ref="432" class="on">A432</button><button data-ref="440">A440</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="tunings" id="tunings"></div>
+
+  <div class="stage">
+    <canvas id="water"></canvas>
+    <div class="pads" id="pads"></div>
+  </div>
+
+  <div class="modes" id="modes">
+    <button data-mode="soft" class="on">Soft</button>
+    <button data-mode="hard">Hard</button>
+    <button data-mode="sing">Sing</button>
+    <button data-mode="fork">Fork</button>
+    <button data-mode="drone">Drone</button>
+  </div>
+
+  <div class="hits">
+    <button class="hit" id="gongBtn" type="button"><span class="glow"></span><b>Gong</b><span class="sub">soft roll · Hard mode: full strike</span></button>
+    <button class="hit" id="chimeBtn" type="button"><span class="glow"></span><b>Chimes</b><span class="sub">tap for a shimmer</span></button>
+  </div>
+  <div class="chips">
+    <button class="chip" id="windBtn" type="button">Wind chimes</button>
+  </div>
+
+  <h3>Nature</h3>
+  <div class="chips" id="nature">
+    <button class="chip" data-bed="ocean" type="button">Ocean</button>
+    <button class="chip" data-bed="rain" type="button">Rain</button>
+    <button class="chip" data-bed="creek" type="button">Creek</button>
+    <button class="chip" id="owlBtn" type="button">Owls</button>
+  </div>
+  <div class="slider"><label for="nat">Level</label><input id="nat" type="range" min="0" max="100" value="45"><output id="natV">45</output></div>
+  <div class="chips owlx" id="owlVoice" style="display:none"><button class="chip" data-v="mine" type="button">My hoots</button><button class="chip" data-v="synth" type="button">Synth owls</button></div>
+  <div class="slider owlx" style="display:none"><label for="owlRate">Owls</label><input id="owlRate" type="range" min="1" max="10" value="5"><output id="owlRateV"></output></div>
+  <div class="slider owlx" style="display:none"><label for="owlDist">Distance</label><input id="owlDist" type="range" min="0" max="10" value="5"><output id="owlDistV"></output></div>
+
+  <h3>Binaural <small>headphones</small></h3>
+  <div class="chips" id="bin">
+    <button class="chip on" data-beat="0" type="button">Off</button>
+    <button class="chip" data-beat="2.5" type="button">Delta · sleep</button>
+    <button class="chip" data-beat="6" type="button">Theta · deep</button>
+    <button class="chip" data-beat="10" type="button">Alpha · calm</button>
+  </div>
+
+  <h3>Bowls</h3>
+  <div class="slider"><label for="tide">Tide</label><input id="tide" type="range" min="0" max="15" value="0"><output id="tideV">off</output></div>
+  <div class="slider"><label for="space">Space</label><input id="space" type="range" min="0" max="100" value="55"><output id="spaceV">55%</output></div>
+  <div class="slider"><label for="vol">Level</label><input id="vol" type="range" min="0" max="100" value="80"><output id="volV">80</output></div>
+
+  <div class="row">
+    <div class="oct">Octave <button class="btn small" id="octDn">−</button><span id="octV">0</span><button class="btn small" id="octUp">+</button></div>
+  </div>
+  <div class="row">
+    <button class="btn" id="relSing">Release sing</button>
+    <button class="btn" id="relDrone">Release drones</button>
+    <button class="btn" id="relAll">Release all</button>
+  </div>
+
+  <details>
+    <summary>Character</summary>
+    <div class="slider"><label for="ring">Bowl ring</label><input id="ring" type="range" min="5" max="60" value="30"><output id="ringV">30s</output></div>
+    <div class="slider"><label for="fring">Fork ring</label><input id="fring" type="range" min="4" max="40" value="18"><output id="fringV">18s</output></div>
+    <div class="slider"><label for="rub">Rub speed</label><input id="rub" type="range" min="20" max="300" value="70"><output id="rubV">0.7</output></div>
+    <div class="slider"><label for="root">Root</label><input id="root" type="range" min="36" max="72" value="48"><output id="rootV">C3</output></div>
+  </details>
+
+  <p class="tip">No sound? Turn the volume up with the side buttons, and if it still says "sound blocked", open this page in Safari. The screen stays awake while it plays. Headphones bring out the slow beating in the bowls.</p>
+</main>
+
+<div id="sleepSheet" class="sheet" hidden>
+  <div class="card">
+    <h3>Sleep</h3>
+    <p class="dim">Plays as you choose. Steady, gentle sound that fades away on its own. No gongs or binaural.</p>
+    <div class="lab">Sounds <span class="hint">pick any</span></div>
+    <div class="chips" id="slSounds"></div>
+    <div class="lab">Extras</div>
+    <div class="chips" id="slExtras"></div>
+    <div class="chips" id="slOwlVoice"><button class="chip" data-v="mine" type="button">My hoots</button><button class="chip" data-v="synth" type="button">Synth owl</button></div>
+    <div class="slider" id="sleepOwlRow"><label for="sleepOwlRate">Owl</label><input id="sleepOwlRate" type="range" min="1" max="10" value="3"><output id="sleepOwlRateV"></output></div>
+    <div class="slider" id="sleepVoiceRow"><label for="sleepVoiceRate">Voice</label><input id="sleepVoiceRate" type="range" min="0" max="10" value="4"><output id="sleepVoiceRateV"></output></div>
+    <div class="voicex">
+      <div class="slider"><label for="voiceRev">Reverb</label><input id="voiceRev" type="range" min="0" max="100" value="40"><output id="voiceRevV"></output></div>
+      <div class="slider"><label for="voiceEcho">Echo</label><input id="voiceEcho" type="range" min="0" max="100" value="25"><output id="voiceEchoV"></output></div>
+      <div class="chips"><button class="chip" id="voiceSoft" type="button">Soften voice</button><button class="chip" id="voiceHear" type="button">▶ Hear it</button></div>
+    </div>
+    <div class="lab">Background noise</div>
+    <div class="chips" id="slNoise"></div>
+    <div class="slider" id="noiseRow"><label for="sleepNoise">Noise</label><input id="sleepNoise" type="range" min="5" max="100" value="40"><output id="sleepNoiseV">40</output></div>
+    <div class="lab">Start</div>
+    <div class="chips" id="slDelay"></div>
+    <div class="row" id="atRow"><input type="time" id="atTime" class="btn"></div>
+    <div class="lab">Timer</div>
+    <div class="chips" id="slTimer"></div>
+    <div class="lab">Fade out</div>
+    <div class="chips" id="slFade"></div>
+    <div class="lab">When the timer ends</div>
+    <div class="chips" id="slAfter"></div>
+    <div class="lab">Screen</div>
+    <div class="chips" id="slScreen"></div>
+    <div class="slider"><label for="sleepVol">Volume</label><input id="sleepVol" type="range" min="5" max="60" value="30"><output id="sleepVolV">30</output></div>
+    <p class="dim small">Keep the phone across the room from the bed, not in it, and keep it quiet: softer than normal talking. Leave it plugged in, because the screen has to stay on for the sound to keep playing.</p>
+    <div class="row end"><button class="btn" id="sleepCancel" type="button">Cancel</button><button class="btn primary" id="sleepGo" type="button">Start</button></div>
+  </div>
+</div>
+
+<div id="sleepScreen" hidden>
+  <div class="moon"></div>
+  <div id="sleepLeft"></div>
+  <button class="hold" id="holdArea" type="button">tap to wake</button>
+</div>
+
+<script>
+(() => {
+  // ---------------------------------------------------------------- tunings
+  const SETS = [
+    { name: "chakra", notes: [0, 2, 4, 5, 7, 9, 11] },
+    { name: "solfeggio", hz: [174, 285, 396, 417, 528, 639, 741, 852, 963] },
+    { name: "planetary", hz: [126.22, 136.10, 140.25, 141.27, 144.72, 147.85, 172.06, 183.58, 194.18, 207.36, 210.42, 211.44, 221.23] },
+    { name: "pentatonic", notes: [0, 2, 4, 7, 9] },
+    { name: "hirajoshi", notes: [0, 2, 3, 7, 8] },
+    { name: "om overtones", harmonics: 68.05 },
+  ];
+  const NOTE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+  const S = { owlVoice: "mine", owlDist: 5, owlRate: 5, nat: 45, set: 0, ref: 432, root: 48, octave: 0, forkOct: 1, droneOct: -1,
+              mode: "soft", tide: 0, space: 55, vol: 80, ring: 30, fring: 18, rub: 0.7 };
+  try { Object.assign(S, JSON.parse(localStorage.getItem("stillwater") || "{}")); } catch (e) {}
+  const save = () => { try { localStorage.setItem("stillwater", JSON.stringify(S)); } catch (e) {} };
+
+  let freqs = [];
+  function computeFreqs() {
+    const s = SETS[S.set];
+    let list;
+    if (s.notes) list = s.notes.map(n => S.ref * 2 ** ((S.root + n - 69) / 12));
+    else if (s.hz) list = s.hz;
+    if (list) freqs = Array.from({ length: 16 }, (_, i) => list[i % list.length] * 2 ** Math.floor(i / list.length));
+    else freqs = Array.from({ length: 16 }, (_, i) => s.harmonics * (i + 2));
+  }
+  const bowlHz = i => freqs[i] * 2 ** S.octave;
+  const forkHz = i => freqs[i] * 2 ** (S.octave + S.forkOct);
+  const droneHz = i => freqs[i] * 2 ** (S.octave + S.droneOct);
+  const panFor = i => ((i % 4) - 1.5) / 1.5 * 0.6;
+
+  // ---------------------------------------------------------------- audio
+  let ctx, bus, dryG, wetG, master, noiseBuf, conv, comp, natureBus, longNoise, brownNoise, pinkNoise, forest, bedsIn;
+  const singers = new Map(), drones = new Map();
+
+  function makeIR(seconds = 8.5, tau = 1.45) {
+    const sr = ctx.sampleRate, len = Math.floor(sr * seconds);
+    const ir = ctx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c); let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        lp += ((Math.random() * 2 - 1) - lp) * (0.35 - 0.25 * Math.min(1, t / seconds)); // darkens as it tails
+        d[i] = lp * Math.exp(-t / tau) * (t < 0.012 ? t / 0.012 : 1);
+      }
+    }
+    return ir;
+  }
+
+  function initAudio() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    bus = ctx.createGain();
+    dryG = ctx.createGain(); dryG.gain.value = 1;
+    conv = ctx.createConvolver(); conv.buffer = makeIR();
+    wetG = ctx.createGain();
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -8; comp.knee.value = 4; comp.ratio.value = 16; comp.attack.value = 0.004; comp.release.value = 0.3;
+    master = ctx.createGain();
+    bus.connect(dryG).connect(comp);
+    bus.connect(conv).connect(wetG).connect(comp);
+    comp.connect(master).connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    // nature beds: mostly dry, a little room
+    forest = ctx.createConvolver(); forest.buffer = makeIR(2.4, 0.42);   // short outdoor space for owls
+    forest.connect(comp);
+    natureBus = ctx.createGain(); natureBus.gain.value = (S.nat / 100) * 0.9;
+    natureBus.connect(comp);
+    bedsIn = ctx.createGain(); bedsIn.connect(natureBus);   // beds get a touch of hall; owls skip it
+    const natSend = ctx.createGain(); natSend.gain.value = 0.12; bedsIn.connect(natSend).connect(conv);
+    const len = ctx.sampleRate * 6;
+    longNoise = ctx.createBuffer(2, len, ctx.sampleRate); brownNoise = ctx.createBuffer(2, len, ctx.sampleRate);
+    pinkNoise = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = pinkNoise.getChannelData(c); let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < len; i++) {
+        const x = Math.random() * 2 - 1;
+        b0 = .99886 * b0 + x * .0555179; b1 = .99332 * b1 + x * .0750759; b2 = .969 * b2 + x * .153852;
+        b3 = .8665 * b3 + x * .3104856; b4 = .55 * b4 + x * .5329522; b5 = -.7616 * b5 - x * .016898;
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + x * .5362) * .11; b6 = x * .115926;
+      }
+    }
+    for (let c = 0; c < 2; c++) {
+      const w = longNoise.getChannelData(c), br = brownNoise.getChannelData(c); let last = 0;
+      for (let i = 0; i < len; i++) { const x = Math.random() * 2 - 1; w[i] = x; last = (last + 0.02 * x) / 1.02; br[i] = last * 3.5; }
+      const d0 = br[len - 1] - br[0]; for (let i = 0; i < len; i++) br[i] -= d0 * i / len; // seamless loop
+    }
+    applyMix();
+    loadClips();
+  }
+  function applyMix() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    wetG.gain.setTargetAtTime((S.space / 100) * 1.1, t, 0.3);
+    dryG.gain.setTargetAtTime(1 - (S.space / 100) * 0.25, t, 0.3);
+    master.gain.setTargetAtTime((S.vol / 100) * 0.9, t, 0.15);
+  }
+  function panNode(p) {
+    if (ctx.createStereoPanner) { const n = ctx.createStereoPanner(); n.pan.value = p; n.connect(bus); return n; }
+    const n = ctx.createGain(); n.connect(bus); return n;
+  }
+  function osc(f, type = "sine") { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; return o; }
+
+  const RATIOS = [1, 2.71, 5.15, 8.43, 12.3], AMPS = [1, .5, .25, .12, .06], DECS = [1, .55, .3, .18, .1];
+
+  function bowl(f, amp, pan, hard) {
+    const t = ctx.currentTime + 0.005, out = panNode(pan), bright = 0.45 + 0.55 * hard;
+    const att = 0.004 + (1 - hard) * 0.02;
+    let end = t;
+    RATIOS.forEach((r, i) => {
+      const fr = f * r; if (fr > 16000) return;
+      const g = ctx.createGain(), a = 0.5 * AMPS[i] * bright ** i * amp, d = S.ring * DECS[i];
+      g.gain.setValueAtTime(0.00001, t);
+      g.gain.exponentialRampToValueAtTime(a, t + att);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + att + d);
+      g.connect(out);
+      const beat = (0.3 + Math.random() * 0.9) * (i + 1) * 0.6;
+      for (const ff of [fr, fr + beat]) { const o = osc(ff); o.connect(g); o.start(t); o.stop(t + att + d + 0.05); }
+      end = Math.max(end, t + att + d);
+    });
+    if (hard > 0.3) {
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf;
+      const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = Math.min(12000, f * 2.71); bp.Q.value = 2.5;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.5 * hard * amp, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      n.connect(bp).connect(g).connect(out); n.start(t); n.stop(t + 0.08);
+    }
+    setTimeout(() => out.disconnect(), (end - ctx.currentTime + 0.5) * 1000);
+  }
+
+  function fork(f, amp, pan) {
+    const t = ctx.currentTime + 0.005, out = panNode(pan);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.00001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.00001, t + S.fring);
+    const o = osc(f); o.connect(g).connect(out); o.start(t); o.stop(t + S.fring + 0.05);
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.12 * amp, t); cg.gain.exponentialRampToValueAtTime(0.00001, t + 0.35);
+    const c = osc(Math.min(15000, f * 6.27)); c.connect(cg).connect(out); c.start(t); c.stop(t + 0.4);
+    setTimeout(() => out.disconnect(), (S.fring + 0.6) * 1000);
+  }
+
+  function singOn(i) {
+    const f = bowlHz(i), t = ctx.currentTime;
+    const existing = singers.get(i);
+    if (existing) { existing.parts.forEach(p => p.o.frequency.setTargetAtTime(f * p.r + p.add, t, 1)); existing.lfo.frequency.setTargetAtTime(S.rub, t, .5); return; }
+    const out = panNode(panFor(i)), env = ctx.createGain(), wob = ctx.createGain(), mix = ctx.createGain();
+    env.gain.setValueAtTime(0, t); env.gain.setTargetAtTime(0.18, t, 5 / 3);
+    wob.gain.value = 0.775;
+    const lfo = osc(S.rub), lfoG = ctx.createGain(); lfoG.gain.value = 0.225; lfo.connect(lfoG).connect(wob.gain); lfo.start(t);
+    const b = 0.6 + Math.random() * 0.8;
+    const parts = [ { r: 1, add: 0, a: .5 }, { r: 1, add: b, a: .5 }, { r: 2.71, add: 0, a: .06 }, { r: 2.71, add: b * 1.7, a: .06 }, { r: 5.15, add: 0, a: .03 } ];
+    parts.forEach(p => { p.o = osc(f * p.r + p.add); const g = ctx.createGain(); g.gain.value = p.a; p.o.connect(g).connect(mix); p.o.start(t); });
+    mix.connect(wob).connect(env).connect(out);
+    singers.set(i, { parts, lfo, env, out });
+  }
+  function singOff(i) {
+    const v = singers.get(i); if (!v) return; singers.delete(i);
+    const t = ctx.currentTime;
+    v.env.gain.cancelScheduledValues(t); v.env.gain.setValueAtTime(v.env.gain.value, t); v.env.gain.setTargetAtTime(0, t, 9 / 4);
+    v.parts.forEach(p => p.o.stop(t + 12)); v.lfo.stop(t + 12);
+    setTimeout(() => v.out.disconnect(), 12500);
+  }
+
+  function droneOn(i) {
+    const f = droneHz(i), t = ctx.currentTime;
+    const existing = drones.get(i);
+    if (existing) { existing.parts.forEach(p => p.o.frequency.setTargetAtTime(f * p.r, t, 1.3)); return; }
+    const merger = ctx.createChannelMerger(2), breath = ctx.createGain(), env = ctx.createGain();
+    breath.gain.value = 0.85;
+    const lfo = osc(0.07), lfoG = ctx.createGain(); lfoG.gain.value = 0.15; lfo.connect(lfoG).connect(breath.gain); lfo.start(t);
+    const parts = [ { r: 1, ch: 0, a: .5 }, { r: 1.002, ch: 1, a: .5 }, { r: 2.001, ch: 0, a: .25 }, { r: 1.999, ch: 1, a: .25 }, { r: 3, ch: 0, a: .08 }, { r: 3.003, ch: 1, a: .08 } ];
+    parts.forEach(p => { p.o = osc(f * p.r); const g = ctx.createGain(); g.gain.value = p.a; p.o.connect(g).connect(merger, 0, p.ch); p.o.start(t); });
+    env.gain.setValueAtTime(0, t); env.gain.setTargetAtTime(0.12, t, 8 / 3);
+    merger.connect(breath).connect(env).connect(bus);
+    drones.set(i, { parts, lfo, env });
+  }
+  function droneOff(i) {
+    const v = drones.get(i); if (!v) return; drones.delete(i);
+    const t = ctx.currentTime;
+    v.env.gain.cancelScheduledValues(t); v.env.gain.setValueAtTime(v.env.gain.value, t); v.env.gain.setTargetAtTime(0, t, 3);
+    v.parts.forEach(p => p.o.stop(t + 16)); v.lfo.stop(t + 16);
+    setTimeout(() => v.env.disconnect(), 16500);
+  }
+
+
+  // ---------------------------------------------------------------- gong
+  const GONG = [1, 1.52, 2.03, 2.47, 3.1, 3.73, 4.4, 5.2, 6.1, 7.3, 8.6, 10.4, 12.7];
+  let gongGlow = 0, chimeGlow = 0;
+  function gong(hard) {
+    const t = ctx.currentTime + 0.01, out = panNode(0);
+    let f = freqs[0] * 2 ** S.octave; while (f > 90) f /= 2; while (f < 45) f *= 2;
+    const amp = hard ? 0.34 : 0.2;
+    let end = t;
+    GONG.forEach((r, i) => {
+      const fr = f * r * (1 + (Math.random() - 0.5) * 0.012);
+      const peak = amp * 0.78 ** i * (0.6 + Math.random() * 0.4);
+      const bloom = hard ? 0.15 + i * 0.18 : 1 + i * 0.35;   // upper partials swell in later
+      const dec = (hard ? 38 : 28) * (1 - (i / GONG.length) * 0.6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.00001, t);
+      g.gain.exponentialRampToValueAtTime(peak * (hard ? 0.6 : 0.2), t + (hard ? 0.01 : 0.3));
+      g.gain.exponentialRampToValueAtTime(peak, t + bloom);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + bloom + dec);
+      g.connect(out);
+      const beat = 0.2 + Math.random() * 0.6;
+      for (const ff of [fr, fr + beat]) { const o = osc(ff); o.connect(g); o.start(t); o.stop(t + bloom + dec + 0.05); }
+      end = Math.max(end, t + bloom + dec);
+    });
+    // mallet thump
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 220;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(hard ? 0.7 : 0.2, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    n.connect(lp).connect(ng).connect(out); n.start(t); n.stop(t + 0.3);
+    // metallic wash that blooms after the hit
+    const w = ctx.createBufferSource(); w.buffer = longNoise;
+    const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2600; bp.Q.value = 0.9;
+    const wg = ctx.createGain(); const wpk = hard ? 0.05 : 0.02;
+    wg.gain.setValueAtTime(0.00001, t); wg.gain.exponentialRampToValueAtTime(wpk, t + (hard ? 1.4 : 3)); wg.gain.exponentialRampToValueAtTime(0.00001, t + (hard ? 9 : 10));
+    w.connect(bp).connect(wg).connect(out); w.start(t); w.stop(t + 10.1);
+    gongGlow = 1;
+    ripples.push({ center: true, r: 10, life: 1.6, kind: "gong" });
+    setTimeout(() => out.disconnect(), (end - ctx.currentTime + 0.5) * 1000);
+  }
+
+  // ---------------------------------------------------------------- chimes
+  const BAR = [1, 2.76, 5.40, 8.93], BARA = [1, 0.35, 0.15, 0.06];
+  function chime(f, amp, pan, when = 0) {
+    while (f > 4200) f /= 2; while (f < 900) f *= 2;
+    const t = ctx.currentTime + 0.005 + when, out = panNode(pan);
+    let end = t;
+    BAR.forEach((r, i) => {
+      const fr = f * r; if (fr > 16000) return;
+      const d = 7 / (i + 1) ** 0.9, g = ctx.createGain();
+      g.gain.setValueAtTime(0.00001, t); g.gain.exponentialRampToValueAtTime(amp * BARA[i], t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + d);
+      const o = osc(fr); o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.05);
+      end = Math.max(end, t + d);
+    });
+    setTimeout(() => out.disconnect(), (end - ctx.currentTime + 0.5) * 1000);
+  }
+  function chimeNote() { const s = SETS[S.set], n = (s.notes || s.hz || { length: 8 }).length; return freqs[Math.floor(Math.random() * Math.min(16, n + 2))] * 2 ** (S.octave + 3); }
+  function shimmer(amp = 0.07) {
+    const k = 4 + Math.floor(Math.random() * 5); let when = 0;
+    for (let i = 0; i < k; i++) { chime(chimeNote(), amp * (0.6 + Math.random() * 0.4), (Math.random() - 0.5) * 1.4, when); when += 0.06 + Math.random() * 0.18; }
+    chimeGlow = 1;
+  }
+  let windOn = false;
+  function windTick() {
+    if (windOn && ctx) {
+      if (Math.random() < 0.12) shimmer(0.045);
+      else { const k = 1 + Math.floor(Math.random() * 3); for (let i = 0; i < k; i++) chime(chimeNote(), 0.03 + Math.random() * 0.03, (Math.random() - 0.5) * 1.6, i * (0.1 + Math.random() * 0.3)); }
+    }
+    setTimeout(windTick, (windOn ? 0.5 + Math.random() * 2.8 : 0.5) * 1000);
+  }
+
+  // ---------------------------------------------------------------- nature beds
+  const beds = {};
+  function loopSrc(buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = 0; s.start(ctx.currentTime, Math.random() * 5); return s; }
+  function bedOn(name) {
+    const t = ctx.currentTime, env = ctx.createGain(), srcs = [], timers = [];
+    env.gain.setValueAtTime(0, t); env.gain.setTargetAtTime(1, t, 1.5); env.connect(bedsIn);
+    if (name === "ocean") {
+      const s = loopSrc(brownNoise), lp = ctx.createBiquadFilter(), wave = ctx.createGain();
+      lp.type = "lowpass"; lp.frequency.value = 500; wave.gain.value = 0.2;
+      s.connect(lp).connect(wave).connect(env); srcs.push(s);
+      const hiss = loopSrc(longNoise), hp = ctx.createBiquadFilter(), hg = ctx.createGain();
+      hp.type = "bandpass"; hp.frequency.value = 3000; hp.Q.value = 0.5; hg.gain.value = 0;
+      hiss.connect(hp).connect(hg).connect(env); srcs.push(hiss);
+      const nextWave = () => {
+        const now = ctx.currentTime, period = 7 + Math.random() * 6, pk = 0.55 + Math.random() * 0.45;
+        wave.gain.setTargetAtTime(pk, now, period * 0.22); lp.frequency.setTargetAtTime(900 + pk * 900, now, period * 0.22);
+        hg.gain.setTargetAtTime(0.05 * pk, now + period * 0.3, period * 0.12);
+        wave.gain.setTargetAtTime(0.15, now + period * 0.45, period * 0.18); lp.frequency.setTargetAtTime(380, now + period * 0.45, period * 0.2);
+        hg.gain.setTargetAtTime(0, now + period * 0.55, period * 0.15);
+        timers.push(setTimeout(nextWave, period * 1000));
+      };
+      nextWave();
+    } else if (name === "rain") {
+      const s = loopSrc(longNoise), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      hp.type = "highpass"; hp.frequency.value = 900; lp.type = "lowpass"; lp.frequency.value = 7500; g.gain.value = 0.22;
+      s.connect(hp).connect(lp).connect(g).connect(env); srcs.push(s);
+      const b = loopSrc(brownNoise), blp = ctx.createBiquadFilter(), bg = ctx.createGain();
+      blp.type = "lowpass"; blp.frequency.value = 400; bg.gain.value = 0.25;
+      b.connect(blp).connect(bg).connect(env); srcs.push(b);
+      const drips = () => {
+        const now = ctx.currentTime;
+        for (let k = 0; k < 6; k++) {
+          const d = ctx.createBufferSource(); d.buffer = noiseBuf;
+          const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1800 + Math.random() * 4500; f.Q.value = 8;
+          const dg = ctx.createGain(), at = now + Math.random() * 1;
+          dg.gain.setValueAtTime(0.0001, at); dg.gain.exponentialRampToValueAtTime(0.15 + Math.random() * 0.3, at + 0.002); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
+          const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (p.pan) p.pan.value = Math.random() * 2 - 1;
+          d.connect(f).connect(dg).connect(p).connect(env); d.start(at, Math.random() * 0.9); d.stop(at + 0.04);
+        }
+        timers.push(setTimeout(drips, 1000));
+      };
+      drips();
+    } else if (name === "hush") {
+      const b = loopSrc(brownNoise), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      lp.type = "lowpass"; lp.frequency.value = 650; g.gain.value = 0.55;
+      b.connect(lp).connect(g).connect(env); srcs.push(b);
+      const w = loopSrc(longNoise), wl = ctx.createBiquadFilter(), wg = ctx.createGain();
+      wl.type = "lowpass"; wl.frequency.value = 1400; wg.gain.value = 0.05;
+      w.connect(wl).connect(wg).connect(env); srcs.push(w);
+    } else if (name === "fan") {
+      const b = loopSrc(brownNoise), lp = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createGain();
+      lp.type = "lowpass"; lp.frequency.value = 1100; g.gain.value = 0.5; am.gain.value = 0.94;
+      const lfo = osc(5.5), lg = ctx.createGain(); lg.gain.value = 0.06; lfo.connect(lg).connect(am.gain); lfo.start();
+      b.connect(lp).connect(g).connect(am).connect(env); srcs.push(b, lfo);
+      [[120, .012], [240, .005]].forEach(([f, a]) => { const o = osc(f), og = ctx.createGain(); og.gain.value = a; o.connect(og).connect(env); o.start(); srcs.push(o); });
+    } else if (name === "heart") {
+      const womb = loopSrc(brownNoise), wl = ctx.createBiquadFilter(), wg = ctx.createGain();
+      wl.type = "lowpass"; wl.frequency.value = 320; wg.gain.value = 0.35; womb.connect(wl).connect(wg).connect(env); srcs.push(womb);
+      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 650; lp.connect(env);
+      const thump = (at, a) => {
+        [[1, 1], [2, .35]].forEach(([h, ha]) => {
+          const o = osc(80 * h), g = ctx.createGain();
+          o.frequency.setValueAtTime(120 * h, at); o.frequency.exponentialRampToValueAtTime(62 * h, at + .13);
+          g.gain.setValueAtTime(.0001, at); g.gain.exponentialRampToValueAtTime(a * ha, at + .015); g.gain.exponentialRampToValueAtTime(.0001, at + .2);
+          o.connect(g).connect(lp); o.start(at); o.stop(at + .22);
+        });
+      };
+      let next = ctx.currentTime + .5;
+      const sched = () => {
+        while (next < ctx.currentTime + 1.5) { thump(next, .7); thump(next + .28, .42); next += (60 / 62) * (.98 + Math.random() * .04); }
+        timers.push(setTimeout(sched, 500));
+      };
+      sched();
+    } else if (name === "crickets") {
+      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5500; lp.connect(env);
+      const now0 = ctx.currentTime;
+      const crickets = [0, 1, 2].map(k => ({ f: 4100 + Math.random() * 900, pan: (k - 1) * .7 + (Math.random() - .5) * .3,
+        next: now0 + .5 + Math.random() * 2, rate: .7 + Math.random() * .5, a: .06 + Math.random() * .04 }));
+      const chirp = (c, at) => {
+        const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (p.pan) p.pan.value = c.pan; p.connect(lp);
+        for (let j = 0; j < 3; j++) {
+          const st = at + j * .035, o = osc(c.f), g = ctx.createGain();
+          g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(c.a, st + .003); g.gain.setValueAtTime(c.a, st + .013); g.gain.linearRampToValueAtTime(0, st + .02);
+          o.connect(g).connect(p); o.start(st); o.stop(st + .025);
+        }
+      };
+      const sched = () => {
+        const now = ctx.currentTime;
+        crickets.forEach(c => { while (c.next < now + 1.5) { chirp(c, c.next); c.next += c.rate * (.9 + Math.random() * .2); if (Math.random() < .05) c.next += 3 + Math.random() * 5; } });
+        timers.push(setTimeout(sched, 500));
+      };
+      sched();
+    } else if (name === "lullaby") {
+      // original, slowly wandering music-box melody in the major pentatonic of the root
+      const steps = [0, 2, 4, 7, 9, 12, 14, 16], base = 440 * 2 ** ((72 + S.root % 12 - 69) / 12);
+      let idx = 2;
+      const phrase = () => {
+        let when = 0; const n = 4 + Math.floor(Math.random() * 3);
+        for (let k = 0; k < n; k++) {
+          idx = Math.max(0, Math.min(7, idx + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
+          if (k === n - 1) idx = [0, 2, 3][Math.floor(Math.random() * 3)];
+          chime(base * 2 ** (steps[idx] / 12), .075, (Math.random() - .5) * .5, when);
+          when += .9 + Math.random() * .9;
+        }
+        timers.push(setTimeout(phrase, (when + 4 + Math.random() * 5) * 1000));
+      };
+      timers.push(setTimeout(phrase, 1500));
+    } else if (name === "creek") {
+      const s = loopSrc(longNoise), mix = ctx.createGain(); mix.gain.value = 0.5;
+      const bands = [0, 1, 2, 3].map(() => {
+        const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.Q.value = 7; f.frequency.value = 800;
+        const g = ctx.createGain(); g.gain.value = 0.6; s.connect(f).connect(g).connect(mix); return { f, g };
+      });
+      srcs.push(s);
+      const r = loopSrc(brownNoise), rl = ctx.createBiquadFilter(), rg = ctx.createGain();
+      rl.type = "lowpass"; rl.frequency.value = 700; rg.gain.value = 0.35; r.connect(rl).connect(rg).connect(env); srcs.push(r);
+      mix.connect(env);
+      const babble = () => {
+        const now = ctx.currentTime;
+        bands.forEach(b => { if (Math.random() < 0.6) { b.f.frequency.setTargetAtTime(350 + Math.random() ** 1.5 * 2600, now, 0.03 + Math.random() * 0.05); b.g.gain.setTargetAtTime(0.2 + Math.random() * 0.9, now, 0.04); } });
+        timers.push(setTimeout(babble, 60 + Math.random() * 120));
+      };
+      babble();
+    }
+    beds[name] = { env, srcs, timers };
+  }
+  function bedOff(name) {
+    const b = beds[name]; if (!b) return; delete beds[name];
+    const t = ctx.currentTime;
+    b.env.gain.cancelScheduledValues(t); b.env.gain.setValueAtTime(b.env.gain.value, t); b.env.gain.setTargetAtTime(0, t, 1.2);
+    setTimeout(() => { b.timers.forEach(clearTimeout); b.srcs.forEach(x => { try { x.stop(); } catch (e) {} }); b.env.disconnect(); }, 6000);
+    // stop scheduling new waves / drips straight away
+    const stopper = setInterval(() => b.timers.forEach(clearTimeout), 50); setTimeout(() => clearInterval(stopper), 6100);
+  }
+
+  // ---------------------------------------------------------------- binaural
+  let bin = null, binBeat = 0;
+  function binCarrier() { let f = freqs[0] * 2 ** S.octave; while (f > 220) f /= 2; while (f < 100) f *= 2; return f; }
+  function binauralSet(beat) {
+    binBeat = beat;
+    const t = ctx.currentTime;
+    if (!beat) { if (bin) { const b = bin; bin = null; b.env.gain.setTargetAtTime(0, t, 2); b.l.stop(t + 10); b.r.stop(t + 10); } return; }
+    const f = binCarrier();
+    if (bin) { bin.l.frequency.setTargetAtTime(f, t, 1); bin.r.frequency.setTargetAtTime(f + beat, t, 1); return; }
+    const m = ctx.createChannelMerger(2), env = ctx.createGain(), l = osc(f), r = osc(f + beat);
+    l.connect(m, 0, 0); r.connect(m, 0, 1);
+    env.gain.setValueAtTime(0, t); env.gain.setTargetAtTime(0.09, t, 2);
+    m.connect(env).connect(comp);   // straight to output: reverb would smear the beat
+    l.start(t); r.start(t);
+    bin = { l, r, env };
+  }
+
+
+  // ---------------------------------------------------------------- owls
+  // notes: [start, dur, freqFrom, freqTo, amp]
+  function owlCallShape(kind) {
+    if (kind === "hoot") {            // classic friendly "hoo-hoo": short, round, steady pitch
+      const b = 430 + Math.random() * 80, d = .2 + Math.random() * .06, gap = .16 + Math.random() * .06;
+      const step = b * (Math.random() < .5 ? 1 : .94);         // second hoot same or a touch lower
+      const patterns = [
+        [[0, d, b, b, .9], [d + gap, d * 1.15, step, step * .99, .8]],                                       // hoo-hoo
+        [[0, d, b, b, .85], [d + gap, d, step, step, .8], [2 * (d + gap), d * 1.25, step, step * .98, .75]],  // hoo-hoo-hoo
+        [[0, d * 1.3, b, b * .99, .9], [d * 1.3 + gap * 2.5, d, step, step, .8], [d * 2.3 + gap * 3.5, d * 1.15, step, step * .99, .75]], // hoo, hoo-hoo
+      ];
+      return { notes: patterns[Math.floor(Math.random() * patterns.length)], rough: 0, harm: .14, breath: .12, scoop: .975, wob: .002 };
+    }
+    if (kind === "horned") {
+      if (Math.random() < 0.35) {      // female: higher, 6-8 notes
+        const b = 380 + Math.random() * 40;
+        return { notes: [[0, .32, b, b * .97, .7], [.48, .1, b * 1.02, b, .45], [.6, .1, b * 1.03, b, .5], [.74, .36, b * 1.04, b * .97, 1],
+                         [1.34, .3, b, b * .96, .75], [1.86, .3, b, b * .95, .7], [2.38, .42, b * .99, b * .92, .65]], rough: 0, harm: .18, breath: .15, scoop: .96 };
+      }
+      const b = 300 + Math.random() * 45;  // male: "hoo, h'HOO, hoo, hoo"
+      return { notes: [[0, .42, b, b * .96, .7], [.75, .11, b * 1.03, b, .45], [.88, .45, b * 1.04, b * .97, 1],
+                       [1.62, .38, b, b * .95, .75], [2.25, .5, b * .99, b * .92, .7]], rough: 0, harm: .18, breath: .15, scoop: .96 };
+    }
+    if (kind === "barred") {           // "who cooks for you, who cooks for you-all" — raspier, big glides
+      const b = 390 + Math.random() * 60;
+      return { notes: [[0, .28, b * .95, b * 1.02, .75], [.38, .22, b * 1.05, b * 1.2, .85], [.66, .2, b * 1.15, b * 1.05, .8], [.92, .55, b * 1.2, b * .85, 1],
+                       [1.95, .28, b * .95, b * 1.02, .75], [2.33, .22, b * 1.05, b * 1.2, .85], [2.61, .2, b * 1.15, b * 1.05, .8],
+                       [2.87, .28, b * 1.15, b * 1.12, .85], [3.2, 1.05, b * 1.25, b * .6, 1]], rough: .35, harm: .55, breath: .3 };
+    }
+    const b = 760 + Math.random() * 100; // eastern screech owl: quavering descending whinny
+    return { notes: [[0, 1.6, b, b * .62, .6]], rough: 0, harm: .15, breath: .5, quaver: true };
+  }
+  function owlCall(kind, pan, dist) {
+    const t0 = ctx.currentTime + 0.05, shape = owlCallShape(kind);
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (p.pan) p.pan.value = pan;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3400 - dist * 2500;
+    const out = ctx.createGain(); out.gain.value = 0.85 - dist * 0.65;
+    const send = ctx.createGain(); send.gain.value = kind === "hoot" ? 0.04 + dist * 0.4 : 0.1 + dist * 0.6;
+    lp.connect(out).connect(p); p.connect(natureBus); p.connect(send).connect(forest);
+    let end = t0;
+    shape.notes.forEach(([st, dur, f0, f1, amp]) => {
+      const s0 = t0 + st, s1 = s0 + dur;
+      // envelope: soft swell to a peak a third of the way in, then a long tail-off
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, s0);
+      env.gain.linearRampToValueAtTime(amp * .6, s0 + Math.min(.05, dur * .25));
+      env.gain.linearRampToValueAtTime(amp, s0 + dur * (kind === "hoot" ? .4 : .32));
+      env.gain.linearRampToValueAtTime(amp * .5, s0 + dur * .72);
+      env.gain.linearRampToValueAtTime(0, s1);
+      env.connect(lp);
+      const voice = ctx.createGain(); voice.gain.value = 1; voice.connect(env);
+      if (shape.rough) {                // barred owl burr
+        voice.gain.value = 1 - shape.rough;
+        const r = osc(34 + Math.random() * 10), rg = ctx.createGain(); rg.gain.value = shape.rough;
+        r.connect(rg).connect(voice.gain); r.start(s0); r.stop(s1 + .05);
+      }
+      if (shape.quaver) {               // screech owl tremble
+        voice.gain.value = .65;
+        const q = osc(12 + Math.random() * 3), qg = ctx.createGain(); qg.gain.value = .35;
+        q.connect(qg).connect(voice.gain); q.start(s0); q.stop(s1 + .05);
+      }
+      // pitch: scoop up into the note, settle, then sag at the end; tiny wobble so it isn't a test tone
+      const wob = osc(4 + Math.random() * 3), wobG = ctx.createGain(); wobG.gain.value = shape.quaver ? .035 : (shape.wob || .005);
+      wob.connect(wobG); wob.start(s0); wob.stop(s1 + .05);
+      [[1, 1], [2, shape.harm], [3, shape.harm * .3], [4, shape.harm * .12]].forEach(([h, a]) => {
+        if (!a) return;
+        const o = osc(f0 * h), g = ctx.createGain(); g.gain.value = a;
+        o.frequency.setValueAtTime(f0 * h * (shape.scoop || .93), s0);
+        o.frequency.exponentialRampToValueAtTime(f0 * h, s0 + dur * .22);
+        o.frequency.exponentialRampToValueAtTime(f1 * h, s1);
+        const fm = ctx.createGain(); fm.gain.value = f0 * h; wobG.connect(fm).connect(o.frequency);
+        o.connect(g).connect(voice); o.start(s0); o.stop(s1 + .05);
+      });
+      // breath: noise ringing at the note's pitch (the hollow, woody part of a hoot)
+      const n = ctx.createBufferSource(); n.buffer = longNoise;
+      const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 9;
+      bp.frequency.setValueAtTime(f0, s0); bp.frequency.exponentialRampToValueAtTime(f1, s1);
+      const ng = ctx.createGain(); ng.gain.value = shape.breath * 3.2;
+      n.connect(bp).connect(ng).connect(env); n.start(s0, Math.random() * 4); n.stop(s1 + .05);
+      // the soft "h" before each hoot
+      const h = ctx.createBufferSource(); h.buffer = noiseBuf;
+      const hb = ctx.createBiquadFilter(); hb.type = "bandpass"; hb.frequency.value = 1300; hb.Q.value = .7;
+      const hg = ctx.createGain(); const hs = Math.max(t0, s0 - .03);
+      hg.gain.setValueAtTime(0, hs); hg.gain.linearRampToValueAtTime(.06 * amp, hs + .02); hg.gain.linearRampToValueAtTime(0, hs + .07);
+      h.connect(hb).connect(hg).connect(lp); h.start(hs, Math.random() * .8); h.stop(hs + .08);
+      end = Math.max(end, s1);
+    });
+    setTimeout(() => { p.disconnect(); }, (end - ctx.currentTime + 4) * 1000);
+  }
+  // ---------------------------------------------------------------- recorded clips (Patrick's hoots + voice message)
+  const hootBufs = []; let voiceBuf = null, lastHoot = -1;
+  function decode(ab) { return new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); }); }
+  async function loadClip(url) { const r = await fetch(url); if (!r.ok) throw new Error(url); return decode(await r.arrayBuffer()); }
+  function loadClips() {
+    [1, 2, 3, 4, 5].forEach(i => loadClip(`audio/owl${i}.mp3`).then(b => hootBufs.push(b)).catch(() => {}));
+    loadClip("audio/voice_msg.mp3").then(b => { voiceBuf = b; }).catch(() => {});
+  }
+  function myHoot(pan, dist) {
+    if (!hootBufs.length) return false;
+    let i; do { i = Math.floor(Math.random() * hootBufs.length); } while (hootBufs.length > 1 && i === lastHoot);
+    lastHoot = i;
+    const t = ctx.currentTime + 0.05, src = ctx.createBufferSource(); src.buffer = hootBufs[i];
+    src.playbackRate.value = 0.96 + Math.random() * 0.08;          // small natural variation
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 110;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5000 - dist * 3600;
+    const g = ctx.createGain(); g.gain.value = (1 - dist * 0.7) * 1.5;
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (p.pan) p.pan.value = pan;
+    const send = ctx.createGain(); send.gain.value = 0.04 + dist * 0.45;
+    src.connect(hp).connect(lp).connect(g).connect(p); p.connect(natureBus); p.connect(send).connect(forest);
+    src.start(t);
+    setTimeout(() => p.disconnect(), (src.buffer.duration + 4) * 1000);
+    return true;
+  }
+  function hoot(kind, pan, dist) { if (!(S.owlVoice === "mine" && myHoot(pan, dist))) owlCall(kind, pan, dist); }
+  // voice chain: smoothing (de-boom, de-harsh, gentle compression) -> dry + stereo echo + hall reverb
+  let vfx = null;
+  function voiceFx() {
+    if (vfx) return vfx;
+    const inp = ctx.createGain();
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 110;
+    const warm = ctx.createBiquadFilter(); warm.type = "lowshelf"; warm.frequency.value = 250;
+    const deharsh = ctx.createBiquadFilter(); deharsh.type = "peaking"; deharsh.frequency.value = 3200; deharsh.Q.value = 1;
+    const air = ctx.createBiquadFilter(); air.type = "lowpass"; air.Q.value = 0.5;
+    const squash = ctx.createDynamicsCompressor(); squash.threshold.value = -26; squash.ratio.value = 3; squash.knee.value = 12; squash.attack.value = 0.01; squash.release.value = 0.25;
+    const post = ctx.createGain(); post.gain.value = 1.4;
+    inp.connect(hp).connect(warm).connect(deharsh).connect(air).connect(squash).connect(post);
+    const dry = ctx.createGain(); post.connect(dry).connect(comp);
+    // ping-pong-ish echo: two soft, darkening repeats left and right
+    const echoIn = ctx.createGain(); post.connect(echoIn);
+    const taps = [[0.34, -0.45], [0.51, 0.45]].map(([time, pan]) => {
+      const d = ctx.createDelay(2); d.delayTime.value = time;
+      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2400;
+      const fb = ctx.createGain(); fb.gain.value = 0.38;
+      const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (pn.pan) pn.pan.value = pan;
+      echoIn.connect(d); d.connect(lp); lp.connect(fb).connect(d); lp.connect(pn).connect(comp);
+      return fb;
+    });
+    const rev = ctx.createGain(); post.connect(rev).connect(conv);
+    vfx = { inp, warm, deharsh, air, dry, echoIn, taps, rev };
+    applyVoiceFx();
+    return vfx;
+  }
+  function applyVoiceFx() {
+    if (!vfx) return;
+    const t = ctx.currentTime, r = sleepCfg.voiceRev / 100, e = sleepCfg.voiceEcho / 100, soft = sleepCfg.voiceSoft;
+    vfx.warm.gain.setTargetAtTime(soft ? 2.5 : 0, t, 0.05);
+    vfx.deharsh.gain.setTargetAtTime(soft ? -5 : 0, t, 0.05);
+    vfx.air.frequency.setTargetAtTime(soft ? 6500 : 16000, t, 0.05);
+    vfx.dry.gain.setTargetAtTime(0.7 * (1 - r * 0.45), t, 0.05);
+    vfx.echoIn.gain.setTargetAtTime(e * 0.55, t, 0.05);
+    vfx.taps.forEach(fb => fb.gain.setTargetAtTime(0.2 + e * 0.3, t, 0.05));
+    vfx.rev.gain.setTargetAtTime(r * 1.1, t, 0.05);
+  }
+  let voiceSrc = null;
+  function playVoiceMsg() {
+    if (!voiceBuf || !ctx) return;
+    const fx = voiceFx();
+    try { if (voiceSrc) voiceSrc.stop(); } catch (e) {}       // don't overlap when previewing
+    const src = ctx.createBufferSource(); src.buffer = voiceBuf; voiceSrc = src;
+    src.connect(fx.inp); src.start(ctx.currentTime + 0.05);
+  }
+  let owlsOn = false, nextOwl = 0;
+  // 1 = rare, 10 = often (average seconds between calls)
+  const owlGap = r => 90 * (6 / 90) ** ((r - 1) / 9);
+  const sleepOwlGap = r => 300 * (30 / 300) ** ((r - 1) / 9);
+  const fmtGap = sec => "~" + (sec < 60 ? Math.round(sec) + " s" : (sec / 60).toFixed(sec < 120 ? 1 : 0).replace(".0", "") + " min");
+  function owlTick() {
+    if (!ctx) return;
+    const now = ctx.currentTime, sleepOwls = sleep && (sleep.owls || sleep.owlNear) && !sleep.ending && !sleep.waiting;
+    if (!(owlsOn || sleepOwls) || now < nextOwl) return;
+    if (sleepOwls && !owlsOn) {       // sleep: one deep, distant, rare owl
+      const near = sleep.owlNear && (!sleep.owls || Math.random() < .5);
+      hoot("hoot", Math.random() < .5 ? (near ? -.35 : -.7) : (near ? .35 : .7), near ? 0.1 : 0.9);
+      nextOwl = now + sleepOwlGap(sleep.owlRate || 3) * (0.5 + Math.random()); return;
+    }
+    const kind = Math.random() < .75 ? "hoot" : "horned";
+    const pan = (Math.random() < .5 ? -1 : 1) * (0.3 + Math.random() * 0.5);
+    const dist = Math.max(0.02, Math.min(0.95, 0.05 + (S.owlDist / 10) * 0.85 + (Math.random() - 0.5) * 0.2));
+    hoot(kind, pan, dist);
+    if (Math.random() < 0.4) {   // a second owl answers from the other side
+      const delay = 3.5 + Math.random() * 3;
+      setTimeout(() => { if (owlsOn) hoot(kind, -pan, Math.min(.95, dist + .25)); }, delay * 1000);
+    }
+    nextOwl = now + owlGap(S.owlRate) * (0.5 + Math.random());
+  }
+  setInterval(owlTick, 500);
+
+  // ---------------------------------------------------------------- sleep
+  let sleep = null;
+  const SLEEP_SOUNDS = [["rain", "Rain"], ["ocean", "Ocean"], ["creek", "Creek"], ["hush", "Hush"], ["fan", "Fan"],
+    ["crickets", "Crickets"], ["heart", "Heartbeat"], ["lullaby", "Music box"], ["bowls", "Soft bowls"]];
+  const sleepCfg = { voiceRev: 40, voiceEcho: 25, voiceSoft: true, voice: false, voiceRate: 4, owlNear: false, owlRate: 3, sounds: ["rain"], hum: true, owls: false, noise: "off", noiseLvl: 40, delay: 0, atTime: "20:00", minutes: 30, fade: 5, after: "stop", screen: "black", vol: 30 };
+  try { Object.assign(sleepCfg, JSON.parse(localStorage.getItem("stillwater-sleep") || "{}")); } catch (e) {}
+  const saveSleep = () => { try { localStorage.setItem("stillwater-sleep", JSON.stringify(sleepCfg)); } catch (e) {} };
+  const NOISE = { white: [() => longNoise, .3], pink: [() => pinkNoise, .8], brown: [() => brownNoise, 1.1] };
+  const voiceGap = r => r === 0 ? 0 : 60 * 30 * (2 / 30) ** ((r - 1) / 9);
+  const voiceLabel = r => r === 0 ? "once" : fmtGap(voiceGap(r));
+  const sleepLevel = () => (sleepCfg.vol / 100) * 0.9;
+  const noiseLevel = () => sleepLevel() * (sleepCfg.noiseLvl / 100) * (NOISE[sleepCfg.noise] ? NOISE[sleepCfg.noise][1] : 0);
+
+  function syncChips() {
+    document.querySelectorAll("#nature .chip[data-bed]").forEach(c => c.classList.toggle("on", !!beds[c.dataset.bed]));
+    $("owlBtn").classList.toggle("on", owlsOn); document.querySelectorAll(".owlx").forEach(r => r.style.display = owlsOn ? "" : "none");
+    $("windBtn").classList.toggle("on", windOn);
+    document.querySelectorAll("#bin .chip").forEach(x => x.classList.toggle("on", +x.dataset.beat === binBeat));
+    $("tide").value = S.tide; $("tideV").textContent = S.tide === 0 ? "off" : S.tide;
+    updateRelease();
+  }
+  function quietEverything() {
+    [...singers.keys()].forEach(singOff); [...drones.keys()].forEach(droneOff);
+    Object.keys(beds).forEach(bedOff);
+    windOn = false; owlsOn = false; S.tide = 0;
+    if (bin) binauralSet(0);
+    syncChips();
+  }
+  function fmtLeft(sec) { const m = Math.ceil(sec / 60); return m >= 60 ? (Math.floor(m / 60) + " hr " + (m % 60 ? m % 60 + " min" : "")).trim() : m + " min"; }
+
+  // the setup panel is a live preview: `sleep` exists (preview: true) while it's open
+  function startNoise(type) {
+    const t = ctx.currentTime, src = loopSrc(NOISE[type][0]()), g = ctx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(noiseLevel(), t + 1.5);
+    src.connect(g).connect(ctx.destination);
+    return { src, g, type };
+  }
+  function stopNoise() {
+    const n = sleep && sleep.noiseNode; if (!n) return; sleep.noiseNode = null;
+    const t = ctx.currentTime;
+    n.g.gain.cancelScheduledValues(t); n.g.gain.setValueAtTime(n.g.gain.value, t); n.g.gain.linearRampToValueAtTime(0, t + 1);
+    setTimeout(() => { try { n.src.stop(); } catch (e) {} n.g.disconnect(); }, 1300);
+  }
+  function reconcile() {
+    if (!sleep || !ctx) return;
+    const now = ctx.currentTime, was = sleep;
+    SLEEP_SOUNDS.forEach(([n]) => {
+      if (n === "bowls") return;
+      const want = sleepCfg.sounds.includes(n);
+      if (want && !beds[n]) bedOn(n);
+      if (!want && beds[n]) bedOff(n);
+    });
+    const wantHum = sleepCfg.hum || sleepCfg.sounds.includes("bowls");
+    if (wantHum && !drones.has(0)) droneOn(0);
+    if (!wantHum && drones.has(0)) droneOff(0);
+    if (sleepCfg.sounds.includes("bowls") && !was.sounds.includes("bowls")) was.nextBowl = now + 0.8;
+    if ((sleepCfg.owls && !was.owls) || (sleepCfg.owlNear && !was.owlNear)) nextOwl = now + 1.5;
+    if (sleepCfg.voice && !was.voice) { playVoiceMsg(); was.nextVoice = Infinity; }    // preview it right away
+    const curType = was.noiseNode ? was.noiseNode.type : "off";
+    if (curType !== sleepCfg.noise) { stopNoise(); if (NOISE[sleepCfg.noise]) sleep.noiseNode = startNoise(sleepCfg.noise); }
+    Object.assign(sleep, sleepCfg, { sounds: [...sleepCfg.sounds], noiseNode: sleep.noiseNode });
+  }
+  function openSleepSheet() {
+    if (!ready()) return;
+    if (sleepCfg.noise === "off" && sleepCfg.after === "noise") sleepCfg.after = "stop";
+    quietEverything();
+    const t = ctx.currentTime;
+    sleep = { preview: true, ending: false, sounds: [], owls: false, noiseNode: null, nextBowl: t + 1.5 };
+    natureBus.gain.cancelScheduledValues(t); natureBus.gain.setTargetAtTime(0.6, t, 0.3);
+    master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(sleepLevel(), t + 1.5);
+    reconcile();
+    renderSheet();
+    $("sleepSheet").hidden = false;
+  }
+  function delaySeconds() {
+    if (sleepCfg.delay === "at") {
+      const [h, m] = (sleepCfg.atTime || "20:00").split(":").map(Number);
+      const now = new Date(), at = new Date(now); at.setHours(h, m, 0, 0);
+      if (at <= now) at.setDate(at.getDate() + 1);
+      return (at - now) / 1000;
+    }
+    return (+sleepCfg.delay || 0) * 60;
+  }
+  function startSleep() {
+    if (!sleep) return;
+    $("sleepSheet").hidden = true;
+    saveSleep();
+    reconcile();
+    const wait = delaySeconds();
+    if (wait > 1) {   // armed: silent until the start time, then everything comes in on its own
+      stopSleepSounds(false);
+      sleep.preview = false; sleep.waiting = true; sleep.startAt = ctx.currentTime + wait;
+      $("sleepScreen").classList.toggle("nl", sleep.screen === "nl");
+      $("sleepScreen").hidden = false;
+      $("sleepLeft").textContent = "starts in " + fmtLeft(wait);
+      keepAwake();
+      return;
+    }
+    beginSleep();
+  }
+  function beginSleep() {
+    sleep.waiting = false;
+    reconcile();
+    const t = ctx.currentTime;
+    sleep.nextBowl = t + 0.8; nextOwl = t + 1.5;
+    sleep.preview = false; sleep.start = t;
+    sleep.nextVoice = sleep.voice ? t + 5 : Infinity;
+    master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(sleepLevel(), t + 1);
+    if (sleep.minutes) {
+      const total = sleep.minutes * 60, fade = Math.min(sleep.fade * 60, total / 2);
+      sleep.end = t + total;
+      master.gain.setValueAtTime(sleepLevel(), t + total - fade);
+      master.gain.linearRampToValueAtTime(0.0001, t + total);
+      if (sleep.noiseNode && sleep.after === "stop") {
+        const g = sleep.noiseNode.g.gain;
+        g.cancelScheduledValues(t); g.setValueAtTime(noiseLevel(), t);
+        g.setValueAtTime(noiseLevel(), t + total - fade); g.linearRampToValueAtTime(0.0001, t + total);
+      }
+    }
+    $("sleepScreen").classList.toggle("nl", sleep.screen === "nl");
+    $("sleepScreen").hidden = false;
+    $("sleepLeft").textContent = sleep.minutes ? fmtLeft(sleep.minutes * 60) : "all night";
+    keepAwake();
+  }
+  function stopSleepSounds(keepNoise) {
+    Object.keys(beds).forEach(bedOff); [...drones.keys()].forEach(droneOff);
+    if (sleep && sleep.noiseNode && !keepNoise) {
+      const n = sleep.noiseNode, t = ctx.currentTime; sleep.noiseNode = null;
+      n.g.gain.cancelScheduledValues(t); n.g.gain.setValueAtTime(n.g.gain.value, t); n.g.gain.linearRampToValueAtTime(0, t + 1.5);
+      setTimeout(() => { try { n.src.stop(); } catch (e) {} n.g.disconnect(); }, 1800);
+    }
+  }
+  function sleepTick() {
+    if (!sleep || !ctx) return;
+    const now = ctx.currentTime;
+    if (sleep.waiting) { const left = sleep.startAt - now; if (left <= 0) beginSleep(); else $("sleepLeft").textContent = "starts in " + fmtLeft(left); return; }
+    if (sleep.end && !sleep.ending) {
+      $("sleepLeft").textContent = fmtLeft(Math.max(0, sleep.end - now));
+      if (now >= sleep.end) {
+        sleep.ending = true;
+        const keep = sleep.after === "noise" && sleep.noiseNode;
+        stopSleepSounds(keep);
+        $("sleepLeft").textContent = keep ? "noise on all night" : "goodnight";
+        if (!keep) { try { if (wake) { wake.release(); wake = null; } } catch (e) {} }   // let the phone sleep now
+      }
+    }
+    if (!sleep.preview && sleep.voice && !sleep.ending && now >= sleep.nextVoice) {
+      playVoiceMsg();
+      const gap = voiceGap(sleep.voiceRate);
+      sleep.nextVoice = gap ? now + gap * (0.8 + Math.random() * 0.4) : Infinity;
+    }
+    if (sleep.sounds.includes("bowls") && !sleep.ending && now >= sleep.nextBowl) {
+      const i = Math.floor(Math.random() * 5);
+      bowl(freqs[i] * 2 ** (S.octave - 1), 0.07, (Math.random() - .5) * .6, 0.05);
+      sleep.nextBowl = now + 22 + Math.random() * 26;
+    }
+  }
+  setInterval(sleepTick, 1000);
+  function exitSleep() {
+    if (!sleep) return;
+    const t = ctx.currentTime;
+    $("sleepScreen").hidden = true; $("sleepSheet").hidden = true;
+    master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0.0001, t + 1.5);
+    stopSleepSounds(false);
+    sleep = null;
+    setTimeout(() => { natureBus.gain.setTargetAtTime((S.nat / 100) * 0.9, ctx.currentTime, 0.3); applyMix(); syncChips(); keepAwake(); }, 2000);
+  }
+
+  // ---------------------------------------------------------------- UI
+  const $ = id => document.getElementById(id);
+  const padsEl = $("pads"), canvas = $("water"), g2 = canvas.getContext("2d");
+  const energy = Array.from({ length: 16 }, () => ({ bowl: 0, hard: 0, fork: 0 }));
+  const ripples = [];
+  const MODE_COLOR = { soft: "--soft", hard: "--hard", sing: "--sing", fork: "--fork", drone: "--drone" };
+  const css = getComputedStyle(document.documentElement);
+  const color = v => css.getPropertyValue(v).trim();
+
+  const pads = [];
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement("button");
+    b.className = "pad"; b.type = "button";
+    b.innerHTML = '<span class="glow"></span><span class="ring"></span><span class="dr"></span><b></b><span class="hz"></span>';
+    b.addEventListener("pointerdown", e => { e.preventDefault(); play(i); });
+    padsEl.appendChild(b); pads.push(b);
+  }
+
+  function label() {
+    const s = SETS[S.set];
+    pads.forEach((p, i) => {
+      const f = bowlHz(i);
+      p.querySelector("b").textContent = f >= 1000 ? (f / 1000).toFixed(2) + "k" : f < 100 ? f.toFixed(1) : Math.round(f);
+      let sub = "hz";
+      if (s.notes) { const n = S.root + s.notes[i % s.notes.length] + 12 * (Math.floor(i / s.notes.length) + S.octave); sub = NOTE[n % 12] + (Math.floor(n / 12) - 1); }
+      p.querySelector(".hz").textContent = sub;
+    });
+  }
+
+  function ripple(i, kind) {
+    ripples.push({ i, r: 6, life: 1, kind });
+    if (ripples.length > 30) ripples.shift();
+  }
+
+  function play(i) {
+    if (!ctx) return;
+    if (ctx.state !== "running") unlock();
+    switch (S.mode) {
+      case "soft": bowl(bowlHz(i), 0.25 * 0.55, panFor(i), 0.15); energy[i].bowl = 1; ripple(i, "soft"); break;
+      case "hard": bowl(bowlHz(i), 0.25, panFor(i), 1); energy[i].hard = 1; ripple(i, "hard"); break;
+      case "fork": fork(forkHz(i), 0.15, panFor(i)); energy[i].fork = 1; ripple(i, "fork"); break;
+      case "sing": singers.has(i) ? singOff(i) : singOn(i); break;
+      case "drone": drones.has(i) ? droneOff(i) : droneOn(i); break;
+    }
+    updateRelease();
+  }
+
+  function retune() {
+    computeFreqs(); label();
+    if (ctx) { for (const i of singers.keys()) singOn(i); for (const i of drones.keys()) droneOn(i); if (bin) binauralSet(binBeat); }
+    $("ref").classList.toggle("fixed", !SETS[S.set].notes);
+    document.querySelectorAll("#ref button").forEach(b => b.classList.toggle("on", +b.dataset.ref === S.ref));
+    document.querySelectorAll("#tunings .chip").forEach((c, k) => c.classList.toggle("on", k === S.set));
+    $("octV").textContent = (S.octave > 0 ? "+" : "") + S.octave;
+    save();
+  }
+
+  // tuning chips
+  SETS.forEach((s, k) => {
+    const c = document.createElement("button"); c.className = "chip"; c.type = "button"; c.textContent = s.name;
+    c.onclick = () => { S.set = k; retune(); };
+    $("tunings").appendChild(c);
+  });
+  document.querySelectorAll("#ref button").forEach(b => b.onclick = () => { S.ref = +b.dataset.ref; retune(); });
+  $("octDn").onclick = () => { S.octave = Math.max(-2, S.octave - 1); retune(); };
+  $("octUp").onclick = () => { S.octave = Math.min(2, S.octave + 1); retune(); };
+
+  function setMode(m) {
+    S.mode = m;
+    document.querySelectorAll("#modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+    document.documentElement.style.setProperty("--mode", `var(${MODE_COLOR[m]})`);
+    save();
+  }
+  document.querySelectorAll("#modes button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+  function slider(id, key, fmt, after) {
+    const el = $(id), out = $(id + "V");
+    const read = () => { S[key] = key === "rub" ? el.value / 100 : +el.value; out.textContent = fmt(S[key]); };
+    el.value = key === "rub" ? Math.round(S[key] * 100) : S[key];
+    read();
+    el.addEventListener("input", () => { read(); after && after(); save(); });
+  }
+  slider("tide", "tide", v => v === 0 ? "off" : v);
+  slider("space", "space", v => v + "%", applyMix);
+  slider("vol", "vol", v => v, applyMix);
+  slider("ring", "ring", v => v + "s");
+  slider("nat", "nat", v => v, () => { if (natureBus) natureBus.gain.setTargetAtTime((S.nat / 100) * 0.9, ctx.currentTime, 0.2); });
+  const ready = () => { if (!ctx) return false; if (ctx.state !== "running") unlock(); return true; };
+  $("gongBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (ready()) gong(S.mode === "hard"); });
+  $("chimeBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (ready()) shimmer(); });
+  $("windBtn").onclick = () => { if (!ready()) return; windOn = !windOn; $("windBtn").classList.toggle("on", windOn); };
+  document.querySelectorAll("#nature .chip").forEach(c => c.onclick = () => {
+    if (!ready()) return; const n = c.dataset.bed;
+    if (beds[n]) bedOff(n); else bedOn(n);
+    c.classList.toggle("on", !!beds[n]);
+  });
+  const owlUI = () => {
+    document.querySelectorAll(".owlx").forEach(r => r.style.display = owlsOn ? "" : "none");
+    $("owlRateV").textContent = fmtGap(owlGap(S.owlRate));
+    $("owlDistV").textContent = S.owlDist <= 2 ? "close" : S.owlDist >= 8 ? "far" : "mid";
+  };
+  $("owlRate").value = S.owlRate; $("owlDist").value = S.owlDist; owlUI();
+  const owlVoiceUI = () => document.querySelectorAll("#owlVoice .chip, #slOwlVoice .chip").forEach(c => c.classList.toggle("on", c.dataset.v === S.owlVoice));
+  document.querySelectorAll("#owlVoice .chip, #slOwlVoice .chip").forEach(c => c.onclick = () => {
+    S.owlVoice = c.dataset.v; owlVoiceUI(); save();
+    if (ctx && (owlsOn || sleep)) nextOwl = ctx.currentTime + 0.8;   // let them hear the switch
+  });
+  owlVoiceUI();
+  $("owlDist").oninput = () => { S.owlDist = +$("owlDist").value; owlUI(); save(); };
+  $("owlRate").oninput = () => { S.owlRate = +$("owlRate").value; owlUI(); save();
+    if (ctx && owlsOn) nextOwl = Math.min(nextOwl, ctx.currentTime + owlGap(S.owlRate) * (0.3 + Math.random() * 0.5)); };
+  $("owlBtn").onclick = () => {
+    if (!ready()) return; owlsOn = !owlsOn; $("owlBtn").classList.toggle("on", owlsOn); owlUI();
+    if (owlsOn) nextOwl = ctx.currentTime + 1.5;
+  };
+  // sleep sheet
+  $("sleepCancel").onclick = exitSleep;
+  $("sleepSheet").addEventListener("click", e => { if (e.target.id === "sleepSheet") exitSleep(); });
+  function chipRow(id, items, isOn, onTap) {
+    const box = $(id); box.innerHTML = "";
+    items.forEach(([val, label]) => {
+      const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = label;
+      c.onclick = () => { onTap(val); reconcile(); saveSleep(); renderSheet(); }; c.classList.toggle("on", isOn(val)); box.appendChild(c);
+    });
+  }
+  function renderSheet() {
+    chipRow("slSounds", SLEEP_SOUNDS, v => sleepCfg.sounds.includes(v), v => {
+      sleepCfg.sounds = sleepCfg.sounds.includes(v) ? sleepCfg.sounds.filter(x => x !== v) : [...sleepCfg.sounds, v]; });
+    chipRow("slExtras", [["hum", "Low hum"], ["owls", "Far-off owl"], ["owlNear", "Nearby owl"], ["voice", "Mommy & daddy"]], v => sleepCfg[v], v => { sleepCfg[v] = !sleepCfg[v]; });
+    chipRow("slNoise", [["off", "Off"], ["white", "White"], ["pink", "Pink"], ["brown", "Brown"]], v => sleepCfg.noise === v, v => { sleepCfg.noise = v; });
+    $("noiseRow").style.display = sleepCfg.noise === "off" ? "none" : "";
+    $("sleepOwlRow").style.display = (sleepCfg.owls || sleepCfg.owlNear) ? "" : "none";
+    $("slOwlVoice").style.display = (sleepCfg.owls || sleepCfg.owlNear) ? "" : "none";
+    $("sleepVoiceRow").style.display = sleepCfg.voice ? "" : "none";
+    document.querySelector(".voicex").style.display = sleepCfg.voice ? "" : "none";
+    $("voiceRev").value = sleepCfg.voiceRev; $("voiceRevV").textContent = sleepCfg.voiceRev;
+    $("voiceEcho").value = sleepCfg.voiceEcho; $("voiceEchoV").textContent = sleepCfg.voiceEcho;
+    $("voiceSoft").classList.toggle("on", sleepCfg.voiceSoft);
+    $("sleepVoiceRate").value = sleepCfg.voiceRate; $("sleepVoiceRateV").textContent = voiceLabel(sleepCfg.voiceRate);
+    $("sleepOwlRate").value = sleepCfg.owlRate; $("sleepOwlRateV").textContent = fmtGap(sleepOwlGap(sleepCfg.owlRate));
+    chipRow("slDelay", [[0, "Now"], [5, "In 5 min"], [10, "10 min"], [15, "15 min"], [30, "30 min"], [60, "1 hr"], ["at", "At a set time"]],
+      v => sleepCfg.delay === v, v => { sleepCfg.delay = v; });
+    $("atRow").style.display = sleepCfg.delay === "at" ? "" : "none";
+    $("atTime").value = sleepCfg.atTime;
+    $("sleepGo").textContent = sleepCfg.delay ? "Set" : "Start";
+    chipRow("slTimer", [[15, "15 min"], [30, "30 min"], [45, "45 min"], [60, "1 hr"], [90, "1½ hr"], [120, "2 hr"], [0, "All night"]],
+      v => sleepCfg.minutes === v, v => { sleepCfg.minutes = v; });
+    const timed = sleepCfg.minutes > 0;
+    chipRow("slFade", [[1, "Quick · 1 min"], [5, "Slow · 5 min"], [15, "Very slow · 15 min"]], v => sleepCfg.fade === v, v => { sleepCfg.fade = v; });
+    chipRow("slAfter", [["stop", "Silence"], ["noise", "Keep noise on"]], v => sleepCfg.after === v, v => { sleepCfg.after = v; });
+    ["slFade", "slAfter"].forEach(id => { $(id).style.opacity = timed ? 1 : .35; $(id).style.pointerEvents = timed ? "" : "none"; });
+    document.querySelectorAll("#slAfter .chip")[1].style.display = sleepCfg.noise === "off" ? "none" : "";
+    chipRow("slScreen", [["black", "Black"], ["nl", "Night-light"]], v => sleepCfg.screen === v, v => { sleepCfg.screen = v; });
+    $("sleepVol").value = sleepCfg.vol; $("sleepVolV").textContent = sleepCfg.vol;
+    $("sleepNoise").value = sleepCfg.noiseLvl; $("sleepNoiseV").textContent = sleepCfg.noiseLvl;
+    $("sleepGo").disabled = !sleepCfg.sounds.length && sleepCfg.noise === "off" && !sleepCfg.hum;
+    $("sleepGo").style.opacity = $("sleepGo").disabled ? .4 : 1;
+  }
+  $("sleepBtn").onclick = openSleepSheet;
+  $("sleepVol").oninput = () => { sleepCfg.vol = +$("sleepVol").value; $("sleepVolV").textContent = sleepCfg.vol; saveSleep();
+    if (sleep && !sleep.ending && ctx) master.gain.setTargetAtTime(sleepLevel(), ctx.currentTime, 0.3);
+    if (sleep && sleep.noiseNode && ctx) sleep.noiseNode.g.gain.setTargetAtTime(noiseLevel(), ctx.currentTime, 0.3); };
+  // voice effects: change live; hear the result when you let go of a slider
+  ["voiceRev", "voiceEcho"].forEach(id => {
+    $(id).oninput = () => { sleepCfg[id] = +$(id).value; $(id + "V").textContent = sleepCfg[id]; applyVoiceFx(); saveSleep(); };
+    $(id).onchange = () => playVoiceMsg();
+  });
+  $("voiceSoft").onclick = () => { sleepCfg.voiceSoft = !sleepCfg.voiceSoft; $("voiceSoft").classList.toggle("on", sleepCfg.voiceSoft); applyVoiceFx(); saveSleep(); playVoiceMsg(); };
+  $("voiceHear").onclick = () => playVoiceMsg();
+  $("sleepVoiceRate").oninput = () => {
+    sleepCfg.voiceRate = +$("sleepVoiceRate").value; $("sleepVoiceRateV").textContent = voiceLabel(sleepCfg.voiceRate); saveSleep();
+    if (sleep) { sleep.voiceRate = sleepCfg.voiceRate; if (sleep.voice && sleep.nextVoice !== Infinity && ctx) sleep.nextVoice = ctx.currentTime + (voiceGap(sleepCfg.voiceRate) || Infinity); }
+  };
+  $("sleepOwlRate").oninput = () => {
+    sleepCfg.owlRate = +$("sleepOwlRate").value; $("sleepOwlRateV").textContent = fmtGap(sleepOwlGap(sleepCfg.owlRate)); saveSleep();
+    if (sleep) { sleep.owlRate = sleepCfg.owlRate; if (ctx && (sleep.owls || sleep.owlNear)) nextOwl = Math.min(nextOwl, ctx.currentTime + sleepOwlGap(sleepCfg.owlRate) * (0.3 + Math.random() * 0.5)); }
+  };
+  $("sleepNoise").oninput = () => { sleepCfg.noiseLvl = +$("sleepNoise").value; $("sleepNoiseV").textContent = sleepCfg.noiseLvl; saveSleep();
+    if (sleep && sleep.noiseNode && ctx) sleep.noiseNode.g.gain.setTargetAtTime(noiseLevel(), ctx.currentTime, 0.3); };
+  $("sleepGo").onclick = startSleep;
+  $("atTime").oninput = () => { if ($("atTime").value) { sleepCfg.atTime = $("atTime").value; saveSleep(); } };
+  $("holdArea").onclick = exitSleep;
+  $("sleepScreen").addEventListener("pointerdown", e => e.preventDefault());
+  document.querySelectorAll("#bin .chip").forEach(c => c.onclick = () => {
+    if (!ready()) return; binauralSet(+c.dataset.beat);
+    document.querySelectorAll("#bin .chip").forEach(x => x.classList.toggle("on", x === c));
+  });
+  slider("fring", "fring", v => v + "s");
+  slider("rub", "rub", v => v.toFixed(1), () => { if (ctx) for (const v of singers.values()) v.lfo.frequency.setTargetAtTime(S.rub, ctx.currentTime, .5); });
+  slider("root", "root", v => NOTE[v % 12] + (Math.floor(v / 12) - 1), retune);
+
+  function updateRelease() {
+    $("relSing").classList.toggle("live", singers.size > 0);
+    $("relDrone").classList.toggle("live", drones.size > 0);
+    $("relAll").classList.toggle("live", singers.size + drones.size > 0);
+  }
+  const relSing = () => { [...singers.keys()].forEach(singOff); updateRelease(); };
+  const relDrone = () => { [...drones.keys()].forEach(droneOff); updateRelease(); };
+  $("relSing").onclick = relSing; $("relDrone").onclick = relDrone;
+  $("relAll").onclick = () => { relSing(); relDrone(); };
+
+  // tide: free-time auto player, weighted toward the lower bowls
+  function tideTick() {
+    if (ctx && S.tide > 0) {
+      const n = Math.min(16, (SETS[S.set].notes || SETS[S.set].hz || { length: 8 }).length + 3);
+      const i = Math.floor(n * Math.random() ** 1.6), r = Math.random();
+      if (r > .92) shimmer(0.05);
+      else { const keep = S.mode; S.mode = r < .58 ? "soft" : r < .76 ? "hard" : "fork"; play(i); S.mode = keep; }
+    }
+    const mean = S.tide === 0 ? 0.5 : 22 * (1 - (S.tide - 1) / 14) + 1.5;
+    setTimeout(tideTick, (S.tide === 0 ? 0.5 : mean * (0.5 + Math.random())) * 1000);
+  }
+
+  // animation: pad glow + ripples on the water
+  function resize() {
+    const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr; g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const kb = Math.pow(1 / 15, dt / (S.ring * 0.4)), kf = Math.pow(1 / 15, dt / (S.fring * 0.4));
+    const tsec = now / 1000, breathe = (Math.sin(tsec * 2 * Math.PI * S.rub) + 1) / 2, slow = (Math.sin(tsec * 2 * Math.PI * 0.12) + 1) / 2;
+    const cr = canvas.getBoundingClientRect();
+    g2.clearRect(0, 0, cr.width, cr.height);
+
+    pads.forEach((p, i) => {
+      const e = energy[i]; e.bowl *= kb; e.hard *= kb; e.fork *= kf;
+      const glow = p.firstChild;
+      const lvl = Math.max(e.bowl, e.hard, e.fork);
+      const col = e.hard >= e.bowl && e.hard >= e.fork ? color("--hard") : e.fork > e.bowl ? color("--fork") : color("--soft");
+      glow.style.opacity = lvl.toFixed(3);
+      glow.style.boxShadow = `0 0 ${10 + 26 * lvl}px ${col}66, inset 0 0 ${18 * lvl}px ${col}55`;
+      p.style.borderColor = lvl > 0.05 ? col + Math.round(40 + lvl * 160).toString(16).padStart(2, "0") : "";
+      const ring = p.children[1];
+      if (singers.has(i)) { ring.style.opacity = (0.35 + breathe * 0.6).toFixed(2); ring.style.transform = `scale(${0.92 + breathe * 0.1})`; }
+      else ring.style.opacity = 0;
+      p.children[2].style.opacity = drones.has(i) ? (0.4 + slow * 0.6).toFixed(2) : 0;
+    });
+
+    gongGlow *= Math.pow(0.05, dt / 8); chimeGlow *= Math.pow(0.05, dt / 2.5);
+    $("gongBtn").firstChild.style.opacity = gongGlow.toFixed(3);
+    $("chimeBtn").firstChild.style.opacity = chimeGlow.toFixed(3);
+    for (let k = ripples.length - 1; k >= 0; k--) {
+      const r = ripples[k];
+      let x, y;
+      if (r.center) { x = cr.width / 2; y = cr.height / 2; }
+      else { const pr = pads[r.i].getBoundingClientRect(); x = pr.left + pr.width / 2 - cr.left; y = pr.top + pr.height / 2 - cr.top; }
+      r.r += dt * (r.kind === "fork" ? 30 : r.kind === "gong" ? 34 : 46); r.life -= dt * (r.kind === "gong" ? 0.3 : 0.42);
+      if (r.life <= 0) { ripples.splice(k, 1); continue; }
+      const c = r.kind === "gong" ? "#e9b56f" : color(r.kind === "hard" ? "--hard" : r.kind === "fork" ? "--fork" : "--soft");
+      g2.strokeStyle = c; g2.lineWidth = r.kind === "hard" ? 1.4 : 1;
+      for (let w = 0; w < (r.kind === "fork" ? 1 : r.kind === "gong" ? 4 : 2); w++) {
+        const rr = r.r - w * 12; if (rr <= 0) continue;
+        g2.globalAlpha = Math.max(0, Math.min(1, r.life) * (w ? 0.25 : 0.5));
+        g2.beginPath(); g2.arc(x, y, rr, 0, Math.PI * 2); g2.stroke();
+      }
+    }
+    g2.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+
+  // start: audio has to begin from a tap on phones
+  let wake, silentEl;
+  async function keepAwake() { try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) {} }
+
+  // iPhone: a looping silent <audio> element moves the page into "playback" audio,
+  // which plays even with the ringer switch on silent
+  function silentWavUrl() {
+    const sr = 8000, n = sr, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => [...s].forEach((ch, k) => v.setUint8(o + k, ch.charCodeAt(0)));
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  }
+  function unlock() {
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    try {
+      if (!silentEl) { silentEl = document.createElement("audio"); silentEl.src = silentWavUrl(); silentEl.loop = true; silentEl.setAttribute("playsinline", ""); }
+      const p = silentEl.play(); if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+    if (!ctx) return;
+    try {
+      const b = ctx.createBuffer(1, 1, ctx.sampleRate), s = ctx.createBufferSource();
+      s.buffer = b; s.connect(ctx.destination); s.start(0);
+    } catch (e) {}
+    if (ctx.state !== "running") { const p = ctx.resume(); if (p && p.then) p.then(showStatus, showStatus); }
+    showStatus();
+  }
+  function showStatus() {
+    const el = $("status"); if (!el) return;
+    const ok = ctx && ctx.state === "running";
+    el.textContent = ok ? "sound on" : "sound blocked: tap here";
+    el.classList.toggle("bad", !ok);
+  }
+
+  $("start").addEventListener("click", () => {
+    try { initAudio(); } catch (e) {}
+    unlock();
+    $("start").style.display = "none";
+    keepAwake();
+    setTimeout(showStatus, 300);
+  });
+  // any tap re-unlocks if the phone suspended audio
+  ["touchend", "click"].forEach(ev => document.addEventListener(ev, () => { if (ctx && ctx.state !== "running") unlock(); }, true));
+  $("status").addEventListener("click", () => { unlock(); if (ctx) { bowl(bowlHz(0), 0.2, 0, 0.6); } });
+  setInterval(showStatus, 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") { keepAwake(); if (ctx && ctx.state !== "running") unlock(); }
+  });
+
+  setMode(S.mode);
+  retune();
+  resize();
+  requestAnimationFrame(frame);
+  tideTick();
+  windTick();
+})();
+</script>
+</body>
+</html>
